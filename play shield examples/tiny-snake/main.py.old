@@ -29,13 +29,11 @@
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/unexpectedmaker/tinypico"
 
-from machine import I2C, Pin, Timer, PWM, UART
+from machine import I2C, Pin, Timer, PWM
 import tinypico as TinyPICO
 import time, random, ssd1306, framebuf, bitmaps, math, notes
 from micropython import const
 import _thread
-# import gc
-# gc.enable()
 
 # Turn off the power to the DotStar
 TinyPICO.set_dotstar_power( False )
@@ -232,34 +230,29 @@ def text_horiz_centred(fb, text, y, char_width=8):
     fb.text(text, (fb.width - len(text) * char_width) // 2, y)
 
 # Buttons
-# BUT_1 = Pin(26, Pin.IN )
-BUT_1 = Pin(5, Pin.IN , pull=Pin.PULL_UP)
+BUT_1 = Pin(26, Pin.IN )
 BUT_2 = Pin(27, Pin.IN )
-# BUT_3 = Pin(15, Pin.IN )
-BUT_3 = Pin(4, Pin.IN , pull=Pin.PULL_UP)
+BUT_3 = Pin(15, Pin.IN )
 BUT_4 = Pin(14, Pin.IN )
 
 last_button_press_time = 0
 
 def process_button_1():
-    print("Pressed Button 1")
     if game_state == 1:
         player_turn(1)
 
 def process_button_2():
-    print("Pressed Button 2")
     if game_state == 0:
         switch_state(1)
     elif game_state == 3:
         switch_state(0)
 
 def process_button_3():
-    print("Pressed Button 3")
     if game_state == 1:
         player_turn(-1)
 
 def process_button_4():
-    print("Pressed Button 4")
+    # print("Pressed Button 4")
     toggle_server()
 
 button_handlers = { str(BUT_1): process_button_1, str(BUT_2): process_button_2, str(BUT_3):process_button_3, str(BUT_4): process_button_4 }
@@ -270,8 +263,7 @@ def button_press_callback(pin):
     if last_button_press_time < time.ticks_ms():
 
         # add 150ms delay between button presses... might be too much, we'll see!
-        # last_button_press_time = time.ticks_ms() + 150
-        last_button_press_time = time.ticks_ms() + 300
+        last_button_press_time = time.ticks_ms() + 150
 
         # If the pin is in the callback handler dictionary, call the appropriate function
         if str(pin) in button_handlers:
@@ -365,8 +357,7 @@ def draw_snake():
 
     # Update the OLED
     oled.show()
-    # time.sleep( snake.get_speed() )
-    time.sleep( snake.get_speed() * 2 )
+    time.sleep( snake.get_speed() )
 
     # If the snake died in that move, end the game
     if snake.is_dead():
@@ -396,105 +387,84 @@ def show_gameover():
     # oled.text("2 - Continue", 15, 50, 2)
     oled.show()
 
-# 
-# def handle_uart():
-#     print("handle_uart")
-#     global uart
-#     lines = []
-#     while True:
-#         line = uart.readline()
-#         if not line:
-#             break
-#         lines.append(line)
-#     print("lines")
-
-
 def loop():
-    global game_state, game_state_changed
-    # uart = UART(2, 9600)
-    # uart.init(9600, bits=8, parity=None, stop=1)  # , tx=4, txbuf=0, rxbuf=256)
+    global game_state_changed, game_state
     while True:
         if game_state_changed:
             game_state_changed = False
-    
+
             if game_state == 0:
                 show_menu()
             elif game_state == 1:
                 setup_new_game()
             elif game_state == 3:
                 show_gameover()
-    
+
         # menu
         if game_state == 0:
             flash_text( 0, 30, "Press 2 to start")
             oled.show()
             time.sleep(.001)
-    
+
         elif game_state == 1:
             draw_snake()
-    
+
         elif game_state == 3:
             flash_text( 24, 30, "GAME OVER")
             oled.show()
             time.sleep(.001)
-        # handle_uart()
+
+_thread.start_new_thread(loop, ())
+
+import network
+
+ssid = 'MicroPython-AP'
+password = '123456789'
+
+def create_accesspoint(ssid, password):
+    ap = network.WLAN(network.AP_IF)
+    ap.active(True)
+    ap.config(essid=ssid, password=password)
+    while ap.active() == False:
+        pass
+    print('Access point ready!')
+    ipinfo = ap.ifconfig()
+    print(ipinfo)
+    return ipinfo[0]
+
+from micropyserver import MicroPyServer
+
+''' there should be a wi-fi connection code here '''
+import json
 
 
-loop()
+def hello_world(request):
+    json_str = json.dumps({"param_one": 1, "param_two": 2})
+    server.send("HTTP/1.0 200 OK\r\n")
+    server.send("Content-Type: application/json\r\n\r\n")
+    server.send(json_str)
+    # server.send("HELLO WORLD!")
 
+def handle_left(request):
+    if game_state == 1:
+        player_turn(-1)
+    json_str = json.dumps({"param_one": 1, "param_two": 2})
+    server.send("HTTP/1.0 200 OK\r\n")
+    server.send("Content-Type: application/json\r\n\r\n")
+    server.send(json_str)
 
+def handle_right(request):
+    if game_state == 1:
+        player_turn(1)
+    json_str = json.dumps({"param_one": 1, "param_two": 2})
+    server.send("HTTP/1.0 200 OK\r\n")
+    server.send("Content-Type: application/json\r\n\r\n")
+    server.send(json_str)
 
-# _thread.start_new_thread(loop, ())
-# 
-# import network
-# 
-# ssid = 'MicroPython-AP'
-# password = '123456789'
-# 
-# def create_accesspoint(ssid, password):
-#     ap = network.WLAN(network.AP_IF)
-#     ap.active(True)
-#     ap.config(essid=ssid, password=password)
-#     while ap.active() == False:
-#         pass
-#     print('Access point ready!')
-#     ipinfo = ap.ifconfig()
-#     print(ipinfo)
-#     return ipinfo[0]
-# 
-# from micropyserver import MicroPyServer
-# 
-# ''' there should be a wi-fi connection code here '''
-# import json
-# 
-# 
-# def hello_world(request):
-#     json_str = json.dumps({"param_one": 1, "param_two": 2})
-#     server.send("HTTP/1.0 200 OK\r\n")
-#     server.send("Content-Type: application/json\r\n\r\n")
-#     server.send(json_str)
-#     # server.send("HELLO WORLD!")
-# 
-# def handle_left(request):
-#     if game_state == 1:
-#         player_turn(-1)
-#     json_str = json.dumps({"param_one": 1, "param_two": 2})
-#     server.send("HTTP/1.0 200 OK\r\n")
-#     server.send("Content-Type: application/json\r\n\r\n")
-#     server.send(json_str)
-# 
-# def handle_right(request):
-#     if game_state == 1:
-#         player_turn(1)
-#     json_str = json.dumps({"param_one": 1, "param_two": 2})
-#     server.send("HTTP/1.0 200 OK\r\n")
-#     server.send("Content-Type: application/json\r\n\r\n")
-#     server.send(json_str)
-# 
-# server = MicroPyServer()
-# server.add_route("/", hello_world)
-# server.add_route("/left", handle_left)
-# server.add_route("/right", handle_right)
-# server.start()
-# 
-# ip = create_accesspoint(ssid, password)
+server = MicroPyServer()
+server.add_route("/", hello_world)
+server.add_route("/left", handle_left)
+server.add_route("/right", handle_right)
+server.start()
+
+ip = create_accesspoint(ssid, password)
